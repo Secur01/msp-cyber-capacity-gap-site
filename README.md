@@ -12,6 +12,11 @@ montrer, à partir de données réelles plutôt que d'une estimation.
 
 **➡ [Voir la page](https://secur01.github.io/msp-cyber-capacity-gap-site/)**
 
+Ce dépôt est délibérément **public** : GitHub Pages ne se publie pas depuis un
+dépôt privé sous le plan actuel de l'organisation, et le seul contenu ici — la
+page elle-même — est conçu pour circuler chez des MSP externes. Le dépôt de
+développement (moteur, tests, habillages) reste privé.
+
 ## Ce que la page calcule
 
 Sept nombres en entrée (utilisateurs gérés, postes gérés, boîtes courriel gérées,
