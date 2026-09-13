@@ -1,0 +1,1137 @@
+<!doctype html>
+<html lang="fr" data-langue="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>MSP Cyber Capacity Gap — Secur01</title>
+<style>
+/* ===========================================================================
+   LE LIVRABLE — clair, coloré, animé, et toujours technique.
+
+   fbernard, 2026-09-10, après avoir comparé les quatre : « better en clair ».
+   Cet habillage était une maquette ; il est devenu la page qui part chez les
+   MSP. L'ancien hybride — bandeau sombre, corps clair — est passé dans
+   `src/skins/hybride.html`.
+
+   Le pari : le registre technique ne vient pas du noir. Il vient de la grille,
+   du monospace, des mesures affichées en clair et d'un vocabulaire de couleur
+   qui SIGNIFIE quelque chose. Ici la grille est un bleu de plan sur fond clair,
+   les quatre couleurs de marque codent les sections, et le mouvement sert à
+   montrer une grandeur qui se remplit — jamais à décorer.
+
+   AUCUN BLOC `prefers-color-scheme` — et c'est délibéré. Les deux autres
+   habillages basculent avec le système, ce qui rend leur corps sombre chez qui
+   travaille en thème sombre : c'est ce qui a fait dire « c'est trop foncé ».
+   Celui-ci commet un seul look, comme la console commet le sien.
+
+   LE MOUVEMENT EST COURT DANS LE RÉSULTAT, LONG DANS LE BANDEAU. Le résultat se
+   re-rend à CHAQUE frappe : une entrée de 900 ms y rejouerait un spectacle à
+   chaque chiffre tapé. Les barres se remplissent en 420 ms, les cartes montent
+   en 220 ms — ça se lit comme une réponse, pas comme une animation. Le bandeau,
+   lui, ne se re-rend jamais : son aurore peut dériver lentement.
+   ======================================================================== */
+/* LA JAUGE TIENT À CETTE DÉCLARATION.
+   Une propriété personnalisée non enregistrée est une CHAÎNE pour le moteur de
+   style : elle saute d'une valeur à l'autre, elle ne se transitionne pas.
+   Enregistrée comme nombre, elle s'interpole — et comme `app.js` la pose sur
+   #resultat, qui survit au rendu, l'arc glisse d'une valeur à la suivante au
+   lieu de repartir de zéro à chaque frappe. */
+@property --couverture {
+  syntax: "<number>"; inherits: true; initial-value: 0;
+}
+
+:root {
+  --cyan: #00AEEF; --bleu: #146EFA; --jaune: #EAB02C; --orange: #FA5A3C;
+  /* Les encres : les mêmes teintes, assez foncées pour porter du TEXTE. */
+  --cyan-encre: #0A6E92; --bleu-encre: #0F55C9; --jaune-encre: #7A5300;
+  --orange-encre: #9C2C14; --vert: #1FA463; --vert-encre: #157A48;
+
+  --fond: #eef3fa;          /* un bleu de plan très délavé, pas un gris */
+  --carte: #ffffff;
+  --encre: #121722;
+  --doux: #4a5468;
+  --tres-doux: #656f82;
+  --trait: #dae2ee;
+  --trait-fort: #b9c5d8;
+
+  --mono: ui-monospace, "SF Mono", "Cascadia Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --r: 10px;
+  --ombre: 0 1px 2px rgba(18,23,34,.05), 0 8px 24px -14px rgba(18,23,34,.22);
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--fond); color: var(--encre);
+  font-family: var(--sans); font-size: 16px; line-height: 1.58;
+  /* La grille de plan, en bleu et sur fond CLAIR : le même signal technique que
+     la console, sans le fond noir. */
+  background-image:
+    linear-gradient(to right, rgba(20,110,250,.055) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(20,110,250,.055) 1px, transparent 1px);
+  background-size: 2.5rem 2.5rem;
+}
+h1, h2, h3 { line-height: 1.18; margin: 0; letter-spacing: -0.015em; }
+p { margin: 0 0 .9rem; } p:last-child { margin-bottom: 0; }
+a { color: var(--bleu-encre); text-underline-offset: 2px; }
+:focus-visible { outline: 2px solid var(--bleu); outline-offset: 2px; border-radius: 4px; }
+.enveloppe { max-width: 60rem; margin: 0 auto; padding: 0 1.25rem; }
+.num, .chiffre { font-variant-numeric: tabular-nums; }
+.mono { font-family: var(--mono); }
+
+/* --- Bandeau : une aurore qui dérive sur du papier millimétré ------------ */
+.heros { position: relative; isolation: isolate; overflow: hidden; padding: 3.4rem 0 2.8rem; }
+/* Trois taches de couleur qui se déplacent lentement l'une par rapport à
+   l'autre. Sur fond clair, elles restent des lavis — pas des néons. */
+.heros::before {
+  content: ""; position: absolute; inset: -30% -10%; z-index: -2;
+  background:
+    radial-gradient(38rem 22rem at 12% 20%, rgba(0,174,239,.34), transparent 62%),
+    radial-gradient(34rem 20rem at 82% 12%, rgba(20,110,250,.28), transparent 62%),
+    radial-gradient(26rem 18rem at 62% 88%, rgba(234,176,44,.26), transparent 62%);
+  animation: aurore 26s ease-in-out infinite alternate;
+}
+@keyframes aurore {
+  0%   { transform: translate3d(0,0,0) scale(1); }
+  50%  { transform: translate3d(-3%, 2%, 0) scale(1.06); }
+  100% { transform: translate3d(2%, -2%, 0) scale(1.02); }
+}
+.kicker {
+  display: inline-flex; align-items: center; gap: .5rem;
+  font-family: var(--mono); font-size: .6875rem; text-transform: uppercase;
+  letter-spacing: .13em; color: var(--cyan-encre); margin-bottom: 1rem;
+  background: rgba(255,255,255,.72); border: 1px solid rgba(20,110,250,.18);
+  padding: .3rem .65rem; border-radius: 99px;
+}
+/* Le point qui bat : le seul élément « vivant » du bandeau, et il est petit. */
+.kicker::before {
+  content: ""; width: .5rem; height: .5rem; border-radius: 50%;
+  background: var(--cyan); animation: battement 2.4s ease-in-out infinite;
+}
+@keyframes battement {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(0,174,239,.55); }
+  70%      { box-shadow: 0 0 0 .55rem rgba(0,174,239,0); }
+}
+.heros h1 { font-size: clamp(2rem, 5.6vw, 3.3rem); font-weight: 700; max-width: 24ch; }
+/* Le titre reste de l'ENCRE. Un dégradé de texte sur fond clair perd tout
+   contraste, et c'est la phrase qui porte la thèse. */
+.degrade { color: var(--encre); }
+.curseur {
+  display: inline-block; width: .5ch; height: .92em; margin-left: .16em;
+  translate: 0 .06em; border-radius: 2px;
+  background: linear-gradient(180deg, var(--cyan), var(--bleu));
+  animation: clign 1.15s steps(1, end) infinite;
+}
+@keyframes clign { 0%,50% { opacity: 1 } 50.01%,100% { opacity: 0 } }
+.heros .sous { color: var(--doux); max-width: 54ch; margin-top: 1.15rem; font-size: 1.04rem; }
+.bascule {
+  position: absolute; top: 1.2rem; right: 1.25rem; z-index: 2;
+  background: #fff; color: var(--bleu-encre); cursor: pointer;
+  border: 1px solid var(--trait-fort); border-radius: 99px;
+  padding: .38rem .85rem; font-family: var(--mono); font-size: .74rem;
+  box-shadow: var(--ombre); transition: border-color .16s, transform .16s;
+}
+.bascule:hover { border-color: var(--cyan); transform: translateY(-1px); }
+
+/* Le filet vit : un reflet le traverse, lentement. */
+.filet, .filet-bas {
+  height: 3px; position: relative; overflow: hidden;
+  background: linear-gradient(90deg, var(--cyan), var(--bleu) 45%, var(--jaune) 78%, var(--orange));
+}
+.filet::after, .filet-bas::after {
+  content: ""; position: absolute; inset: 0; transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,.85), transparent);
+  animation: reflet 5.5s ease-in-out infinite;
+}
+@keyframes reflet { 0% { transform: translateX(-100%) } 55%, 100% { transform: translateX(100%) } }
+
+/* --- Cartes ------------------------------------------------------------- */
+main { padding: 2.2rem 0 3rem; }
+.carte {
+  position: relative; background: var(--carte); border: 1px solid var(--trait);
+  border-radius: var(--r); padding: 1.5rem 1.6rem; margin-bottom: 1.3rem;
+  box-shadow: var(--ombre);
+}
+/* Le liseré de tête, en dégradé plutôt qu'en trait plat. */
+.carte--rail::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+  border-radius: var(--r) var(--r) 0 0;
+  background: linear-gradient(90deg, var(--cyan), var(--bleu));
+}
+.oeil {
+  display: inline-flex; align-items: center; gap: .45rem; font-family: var(--mono);
+  font-size: .6875rem; text-transform: uppercase; letter-spacing: .11em;
+  color: var(--cyan-encre); margin-bottom: .5rem;
+}
+.oeil::before { content: "◆"; font-size: .7em; }
+h2.section {
+  font-size: 1.35rem; font-weight: 700; margin: 2.3rem 0 1rem;
+  display: flex; align-items: center; gap: .7rem;
+}
+h2.section::after {
+  content: ""; flex: 1; height: 2px; border-radius: 2px;
+  background: linear-gradient(90deg, var(--cyan), rgba(20,110,250,0));
+}
+.doux { color: var(--doux); } .petit { font-size: .9rem; } .tres-petit { font-size: .8125rem; }
+
+/* --- Saisie ------------------------------------------------------------- */
+.grille { display: grid; gap: 1.1rem 1.3rem; grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr)); }
+.champ label { display: block; font-weight: 650; font-size: .88rem; margin-bottom: .34rem; }
+.entree { display: flex; align-items: baseline; gap: .55rem; }
+.champ input {
+  width: 100%; max-width: 9rem; padding: .5rem .7rem;
+  font-family: var(--mono); font-size: 1rem; font-variant-numeric: tabular-nums;
+  background: var(--fond); color: var(--encre);
+  border: 1.5px solid var(--trait-fort); border-radius: 7px;
+  transition: border-color .15s, box-shadow .15s, background .15s;
+}
+.champ input:focus {
+  border-color: var(--bleu); background: #fff; outline: none;
+  box-shadow: 0 0 0 4px rgba(20,110,250,.14);
+}
+.champ .unite { color: var(--tres-doux); font-size: .82rem; font-family: var(--mono); }
+.champ .aide { color: var(--doux); font-size: .8125rem; margin-top: .35rem; max-width: 34ch; }
+.actions { display: flex; flex-wrap: wrap; gap: .65rem; align-items: center; margin-top: 1.4rem; }
+button.action {
+  font: inherit; font-weight: 650; font-size: .92rem; cursor: pointer;
+  border-radius: 99px; padding: .55rem 1.15rem; border: 1.5px solid transparent;
+  /* LE DÉGRADÉ D'UN BOUTON DOIT TENIR SUR TOUTE SA LONGUEUR.
+     bleu → cyan mettait du blanc sur #00AEEF à l'extrémité : 2,53:1, illisible.
+     Le cyan reste la couleur qui MARQUE — bordures, liserés, pastilles — et
+     n'est jamais un fond sous du texte. */
+  background: linear-gradient(135deg, var(--bleu-encre), var(--bleu)); color: #fff;
+  box-shadow: 0 6px 18px -10px rgba(20,110,250,.9);
+  transition: transform .16s, box-shadow .16s, filter .16s;
+}
+button.action--fantome {
+  background: #fff; color: var(--bleu-encre); border-color: var(--trait-fort); box-shadow: none;
+}
+button.action:hover { transform: translateY(-1px); filter: brightness(1.05); }
+button.action--fantome:hover { border-color: var(--cyan); }
+.avis { color: var(--orange-encre); font-size: .9rem; font-weight: 600; }
+.confirme { color: var(--vert-encre); font-size: .9rem; font-weight: 600; }
+
+/* --- Résultat ----------------------------------------------------------- */
+#resultat[hidden] { display: none !important; }
+/* C'est ICI que vit l'animation de la jauge : sur l'élément qui persiste. */
+#resultat { transition: --couverture .6s cubic-bezier(.22,.9,.3,1); }
+/* L'entrée du résultat : COURTE, parce qu'elle rejoue à chaque frappe. */
+#resultat > * { animation: monte .22s ease-out both; }
+#resultat > *:nth-child(2) { animation-delay: .03s; }
+#resultat > *:nth-child(3) { animation-delay: .06s; }
+#resultat > *:nth-child(n+4) { animation-delay: .09s; }
+@keyframes monte { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+
+.duo { display: grid; gap: 1.3rem; grid-template-columns: 1fr 1fr; }
+@media (max-width: 46rem) { .duo { grid-template-columns: 1fr } }
+.duo .carte::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 3px;
+  border-radius: var(--r) var(--r) 0 0;
+  background: linear-gradient(90deg, var(--cyan), var(--bleu));
+}
+.duo .carte:nth-child(2)::before { background: linear-gradient(90deg, var(--jaune), var(--orange)); }
+
+.gros {
+  font-size: clamp(2.5rem, 7.6vw, 3.8rem); font-weight: 800; line-height: 1;
+  letter-spacing: -0.035em;
+  background: linear-gradient(135deg, var(--bleu-encre), var(--cyan-encre));
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.duo .carte:nth-child(2) .gros {
+  background: linear-gradient(135deg, var(--orange-encre), var(--jaune-encre));
+  -webkit-background-clip: text; background-clip: text;
+  /* Le chiffre et son anneau, côte à côte. */
+  display: flex; align-items: center; gap: 1rem;
+}
+/* L'ANNEAU DE COUVERTURE.
+   Un dégradé conique masqué en couronne : la part colorée vaut exactement le
+   pourcentage affiché à côté, et elle est bornée à 100 — au-delà, l'anneau est
+   plein, il ne repart pas d'un tour. */
+.duo .carte:nth-child(2) .gros::before {
+  content: ""; flex: none; width: 4.6rem; height: 4.6rem; border-radius: 50%;
+  background: conic-gradient(from -90deg,
+    var(--orange) 0deg,
+    var(--jaune) calc(min(var(--couverture), 100) * 3.6deg),
+    var(--trait) 0deg);
+  -webkit-mask: radial-gradient(farthest-side, transparent 66%, #000 67%);
+  mask: radial-gradient(farthest-side, transparent 66%, #000 67%);
+  -webkit-text-fill-color: initial;
+}
+.gros .u {
+  font-size: .26em; font-weight: 650; color: var(--doux); letter-spacing: 0;
+  margin-left: .4em; -webkit-text-fill-color: var(--doux);
+}
+
+.bande { border-radius: 9px; padding: .95rem 1.1rem; margin-top: 1.1rem; border: 1.5px solid; }
+.bande h3 { font-size: 1.05rem; font-weight: 700; margin-bottom: .35rem; }
+.bande--couvert { border-color: var(--vert); background: rgba(31,164,99,.09); }
+.bande--sous_capacite { border-color: var(--jaune); background: rgba(234,176,44,.14); }
+.bande--impossible { border-color: var(--orange); background: rgba(250,90,60,.13); }
+.bande--couvert h3 { color: var(--vert-encre); }
+.bande--sous_capacite h3 { color: var(--jaune-encre); }
+.bande--impossible h3 { color: var(--orange-encre); }
+.bandeau-lien {
+  border: 1.5px solid var(--jaune); background: rgba(234,176,44,.15); color: var(--jaune-encre);
+  border-radius: 9px; padding: .8rem 1rem; margin: 0 0 1.2rem; font-size: .9rem; font-weight: 650;
+}
+
+/* Les barres : la seule animation qui porte du sens — une grandeur se remplit. */
+.barres { margin-top: 1.2rem; display: grid; gap: .7rem; }
+.barre .t { display: flex; justify-content: space-between; gap: 1rem; font-size: .86rem; margin-bottom: .26rem; }
+.barre .t .num { font-family: var(--mono); font-weight: 650; }
+.barre .p { height: 14px; background: var(--fond); border-radius: 99px; overflow: hidden; box-shadow: inset 0 1px 2px rgba(18,23,34,.09); }
+.barre .p i {
+  display: block; height: 100%; border-radius: 99px; position: relative;
+  transform-origin: left center;
+  /* scaleX ET NON width : la largeur finale est posée en ligne par le script,
+     donc aucune transition ne peut s'y accrocher. Une échelle part toujours de
+     zéro, quelle que soit la largeur d'arrivée. */
+  animation: remplir .42s cubic-bezier(.22,.9,.3,1) both;
+}
+@keyframes remplir { from { transform: scaleX(0); } to { transform: scaleX(1); } }
+.barre--requis .p i { background: linear-gradient(90deg, #9fb0c9, var(--trait-fort)); }
+.barre--dispo .p i { background: linear-gradient(90deg, var(--bleu), var(--cyan)); animation-delay: .07s; }
+.barre--declare .p i { background: linear-gradient(90deg, var(--jaune), var(--orange)); animation-delay: .14s; }
+
+table.decomp { width: 100%; border-collapse: collapse; font-size: .9rem; margin-top: .6rem; }
+table.decomp caption { text-align: left; }
+table.decomp td { padding: .4rem .5rem; border-bottom: 1px solid var(--trait); }
+table.decomp td.n { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+table.decomp tr:last-child td { border-bottom: none; border-top: 2px solid var(--trait-fort); font-weight: 700; }
+
+/* Les trois réalités : une couleur chacune, en pastille et en liseré. */
+.trois { display: grid; gap: 1.3rem; grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr)); }
+.realite {
+  position: relative; background: var(--carte); border: 1px solid var(--trait);
+  border-radius: var(--r); padding: 1.5rem 1.3rem 1.2rem; box-shadow: var(--ombre);
+  transition: transform .18s, box-shadow .18s, border-color .18s;
+}
+.realite::before {
+  content: ""; position: absolute; inset: 0 0 auto 0; height: 4px;
+  border-radius: var(--r) var(--r) 0 0; background: var(--jaune);
+}
+.realite:nth-child(2)::before { background: var(--orange); }
+.realite:nth-child(3)::before { background: var(--cyan); }
+.realite:hover {
+  transform: translateY(-3px);
+  border-color: rgba(0,174,239,.55);
+  box-shadow: 0 2px 4px rgba(18,23,34,.05), 0 18px 34px -18px rgba(0,174,239,.55);
+}
+.realite h3 { font-size: 1.04rem; font-weight: 700; margin-bottom: .5rem; }
+.realite .mesure {
+  margin-top: .8rem; padding: .7rem .8rem; border-radius: 7px;
+  background: var(--fond); color: var(--doux); font-size: .8rem; line-height: 1.55;
+}
+
+/* RÉVÉLATION AU DÉFILEMENT, SANS UNE LIGNE DE JAVASCRIPT.
+   `animation-timeline: view()` accroche l'animation à la position de l'élément
+   dans la fenêtre, pas au temps : elle ne « rejoue » donc pas au re-rendu, et un
+   élément déjà visible est rendu à son état final. Là où le navigateur ne la
+   connaît pas, il n'y a simplement aucune animation — le contenu est visible,
+   ce qui est le bon repli. Le bloc `no-preference` la retire aussi pour qui
+   demande moins de mouvement. */
+@supports (animation-timeline: view()) {
+  @media (prefers-reduced-motion: no-preference) {
+    .trois .realite, #resultat > .carte {
+      animation: reveler linear both;
+      animation-timeline: view();
+      animation-range: entry 5% entry 45%;
+    }
+  }
+}
+@keyframes reveler {
+  from { opacity: 0; transform: translateY(14px) scale(.985); }
+  to   { opacity: 1; transform: none; }
+}
+
+ul.suppose { margin: 0; padding-left: 1.15rem; color: var(--doux); font-size: .9rem; }
+ul.suppose li { margin-bottom: .5rem; } ul.suppose li::marker { color: var(--cyan); }
+ul.suppose li:last-child { margin-bottom: 0; }
+strong.chiffre { color: var(--encre); }
+
+footer { padding: 1.8rem 0 2.6rem; color: var(--doux); font-size: .85rem; }
+footer .filet-bas { margin-bottom: 1.5rem; }
+
+/* Tout le mouvement se coupe d'un bloc. Il n'y a rien ici qu'une animation
+   soit seule à dire : les barres gardent leur largeur, l'aurore sa couleur. */
+@media (prefers-reduced-motion: reduce) {
+  .heros::before, .filet::after, .filet-bas::after, .kicker::before,
+  .curseur, #resultat > *, .barre .p i { animation: none; }
+  .bascule, button.action, .realite { transition: none; }
+  .realite:hover, .bascule:hover, button.action:hover { transform: none; }
+}
+
+@media print {
+  body { background: #fff; background-image: none; font-size: 10.5pt; }
+  .bascule, .actions { display: none !important; }
+  .heros { padding: .8rem 0 1rem; } .heros::before, .curseur { display: none; }
+  .filet::after, .filet-bas::after { display: none; }
+  .carte, .realite, .bande { break-inside: avoid; page-break-inside: avoid; box-shadow: none; }
+  h2.section { break-after: avoid; }
+  .gros { -webkit-text-fill-color: #0F55C9; }
+  .duo .carte:nth-child(2) .gros::before { display: none; }
+  .duo .carte:nth-child(2) .gros { -webkit-text-fill-color: #9C2C14; }
+  .barre .p i, .bande, .realite::before, .filet { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+}
+</style>
+</head>
+<body>
+
+<header class="heros">
+  <button class="bascule" id="bascule" type="button"></button>
+  <div class="enveloppe">
+    <div class="kicker" id="t-kicker"></div>
+    <h1><span class="degrade" id="t-these1"></span><br><span id="t-these2"></span><span class="curseur"></span></h1>
+    <p class="sous" id="t-sous"></p>
+  </div>
+</header>
+<div class="filet"></div>
+
+<main class="enveloppe">
+
+  <section class="carte carte--rail">
+    <div class="oeil" id="t-saisie-oeil"></div>
+    <h2 class="section" id="t-saisie-titre"></h2>
+    <p class="doux petit" id="t-saisie-intro"></p>
+    <div class="grille" id="grille-champs"></div>
+    <div class="actions">
+      <button class="action action--fantome" type="button" id="effacer"></button>
+      <span id="avis" class="avis" role="status" aria-live="polite"></span>
+    </div>
+  </section>
+
+  <div id="resultat" hidden></div>
+
+</main>
+
+<footer>
+  <div class="filet-bas"></div>
+  <div class="enveloppe">
+    <p id="t-pied-conf"></p>
+    <p class="mono tres-petit" id="t-pied-sign"></p>
+  </div>
+</footer>
+
+<script type="application/json" id="donnees-terrain">{"mesureLe":"2026-09-09","provenance":{"fenetre":{"de":"2024-09","a":"2026-08","mois":24,"complete":true}},"entete":{"mois":24,"billets":12327,"heuresTravaillees":5959.6},"partAssiettesCouverte":67.6,"parAssiette":{"utilisateur":{"heuresPar100":12.26},"poste":{"heuresPar100":2.17},"boiteCourriel":{"heuresPar100":2.83}},"dispersion":{"bas":1.67,"mediane":8.24,"haut":28.53,"mini":0,"maxi":56.79,"moyennePonderee":12.26},"chargeMensuelle":{"creux":157.8,"pointe":392.8,"moisMesures":24},"distribution":{"billetsPonctuels":12074,"medianeMinutes":6,"p99Minutes":192,"maxiMinutes":7272},"concentration":[{"topPct":1,"billets":120,"partDuTemps":24.7},{"topPct":5,"billets":603,"partDuTemps":43.4},{"topPct":10,"billets":1207,"partDuTemps":54.2}]}</script>
+<script type="application/json" id="donnees-i18n">{"fr":{"lang":"fr-CA","titre":"MSP Cyber Capacity Gap","kicker":"// Secur01 · mesuré, pas estimé","thesePartie1":"Opérer une vraie division de cybersécurité","thesePartie2":"prend des heures que personne ne compte.","sousTitre":"Entrez la taille de votre parc et de votre équipe. La page vous rend la charge de cybersécurité que nous avons mesurée pour un parc de cette taille — en heures et en personnes — et l’écart avec l’équipe dont vous disposez.","basculer":"English","basculerTitre":"Switch to English","saisieTitre":"Votre parc et votre équipe","saisieIntro":"Sept nombres. Ils ne sont envoyés nulle part.","champs":{"utilisateurs":{"label":"Utilisateurs gérés","unite":"personnes"},"postes":{"label":"Postes gérés","unite":"machines"},"boites":{"label":"Boîtes courriel gérées","unite":"boîtes"},"techniciens":{"label":"Techniciens","unite":"personnes à temps plein","aide":"Toute votre équipe technique, pas seulement la cybersécurité. Un temps partiel compte au prorata."},"partOpsTI":{"label":"Part de leur temps prise par les ops TI","unite":"%","aide":"Soutien, projets, infonuagique, réseau — tout ce qui n’est pas de la cybersécurité. C’est ce champ qui détermine le résultat."},"heuresCyberActuelles":{"label":"Heures de cybersécurité par mois, aujourd’hui","unite":"h / mois","aide":"Votre estimation, telle que vous la présenteriez à un client."},"heuresProductives":{"label":"Heures productives par personne par mois","unite":"h / mois","aide":"140 h correspond à un temps plein moins les vacances, la formation et l’administratif. Ajustez selon votre réalité."}},"refus":{"manquants":"Il manque :","invalides":"Valeur non valide :","parcVide":"Un parc à zéro ne peut pas être dimensionné. Entrez au moins un utilisateur, un poste ou une boîte courriel."},"effacer":"Effacer","resultatTitre":"Ce que cela exige","chargeLabel":"Charge de cybersécurité","chargeUnite":"h / mois","chargeDetail":"Décomposition de la charge","chargePlancher":"Ce chiffre est un plancher. Les trois bases de calcul ci-dessus représentent {part} % du temps de cybersécurité que nous avons mesuré. Le reste ne se rapporte à aucune de ces trois unités : soit l’unité de référence n’est pas définie pour le service concerné, soit ce service fait l’objet d’un contrat distinct. Rien de cela n’est ajouté ici.","couvertureTitre":"Votre couverture","couvertureLabel":"de la charge que votre équipe peut couvrir","bandes":{"couvert":{"titre":"Couvert sur le papier","texte":"Votre équipe dispose des heures nécessaires — en moyenne. Restent les trois réalités ci-dessous, où se situe la difficulté réelle : le mois moyen n’existe dans aucun calendrier."},"sous_capacite":{"titre":"Sous-capacité structurelle","texte":"Il manque {manque} h par mois. En personnel affecté uniquement à la cybersécurité, cela représente {etp} {etpMot} à temps plein ; en techniciens comme les vôtres, qui n’y consacrent qu’une partie de leur temps, {personnes}. Ce n’est pas un arriéré que l’on résorbe : c’est un déficit qui se reproduit chaque mois, et qui se règle en travail non réalisé plutôt qu’en heures supplémentaires."},"impossible":{"titre":"Hors de portée de l’équipe actuelle","texte":"Il manque {manque} h par mois. En personnel affecté uniquement à la cybersécurité, cela représente {etp} {etpMot} à temps plein ; en techniciens comme les vôtres, {personnes}. À ce niveau, la question n’est plus l’organisation du travail : aucune priorisation ne crée {personnes} {personnesMot}.","texteSansDisponibilite":"Il manque {manque} h par mois — {etp} {etpMot} à temps plein affectées uniquement à la cybersécurité. Vos techniciens sont déjà à 100 % sur les opérations TI : embaucher au même régime n’ajoute aucune heure de cybersécurité."}},"barreRequis":"Charge requise","barreDispo":"Capacité disponible de votre équipe","barreDeclare":"Ce que vous estimez y consacrer","declarePhrase":"Les {heures} h que vous estimez y consacrer couvrent {pct} % de la charge mesurée pour un parc de cette taille.","declarePhraseHaut":"Les {heures} h que vous estimez y consacrer couvrent {pct} % de la charge mesurée — au-dessus de ce que nos ratios prévoient pour un parc de cette taille.","realitesTitre":"La moyenne est le meilleur des cas","realitesIntro":"Trois mesures qui expliquent pourquoi cette charge ne s’insère pas dans les intervalles disponibles d’un horaire d’opérations TI.","realites":{"dispersion":{"titre":"Un parc n’est pas une moyenne","texte":"La dispersion est mesurée sur la seule base « utilisateurs ». Vos {utilisateurs} utilisateurs représentent {reference} h par mois à notre ratio moyen ; d’un de nos clients à l’autre, la même population en demanderait de {bas} h à {haut} h, et {maxi} h au ratio de notre client le plus exigeant.","mesure":"Mesuré client par client : quatre clients sur cinq se situent entre {bas100} et {haut100} h par 100 utilisateurs, médiane {mediane} — un facteur {facteur}. L’étendue complète va de {mini} (un client sans aucune minute rattachée sur la période) à {maxi100}. Un client au-dessus de la médiane n’est pas compensé par un client en dessous : les deux doivent être servis le même mois."},"variabilite":{"titre":"La moyenne ne tient pas deux mois de suite","texte":"À l’échelle de votre parc, prévoyez entre {creux} h et {pointe} h selon le mois. Au mois de pointe, votre équipe couvre {couverturePic} %.","mesure":"Mesuré chez nous sur {mois} mois : de {creuxMesure} h à {pointeMesure} h par mois, soit un rapport de {rapport}. Le facteur est appliqué à votre échelle ; l’hypothèse est que le profil mensuel se conserve d’un parc à l’autre."},"concentration":{"titre":"Une faible part des billets concentre l’essentiel du temps","texte":"{partTop1} % du temps se concentre sur 1 % des billets, et {partTop5} % sur 5 %. À votre échelle, ce 1 % représente {heuresTop1} h par mois.","mesure":"Mesuré sur {billets} billets ponctuels : le billet médian compte {mediane} minutes, le 99ᵉ centile {p99}, et le plus important a demandé {maxi} h. Ces heures se concentrent sur peu d’événements ; elles ne se répartissent pas en interventions courtes."}},"supposeTitre":"Ce que ce calcul suppose","suppose":["Les ratios proviennent d’une division dédiée, outillée, avec ses processus et son personnel. Une équipe qui assure aussi les opérations TI n’est pas plus efficace qu’elle : elle est interrompue.","La charge est supposée proportionnelle au nombre d’unités. La mesure porte sur des clients dont l’abonnement compte au moins trois unités ; en dessous, l’échantillon est trop faible pour être extrapolé.","Nos ratios divisent par le plus gros abonnement d’un client, ce qui sous-estime son effectif réel. Si son personnel dépasse cette base, le ratio véritable est plus bas : la charge présentée ici est donc une borne haute — dans le sens qui avantage notre propre argumentaire, raison de plus pour l’écrire.","La dispersion est mesurée entre nos clients, non entre fournisseurs. Elle indique la variété des environnements, non celle des façons de les servir.","Les heures productives par personne sont celles que vous avez saisies. L’ensemble des résultats exprimés en personnes en dépend.","Ce document n’est ni un audit ni une soumission. C’est un ordre de grandeur daté, dont chaque hypothèse ci-dessus peut être vérifiée."],"terrainTitre":"D’où viennent ces chiffres","terrainTexte":"Mesuré chez Secur01 sur {mois} mois — {billets} billets et {heures} h de travail de cybersécurité réalisé par nos équipes, du {de} au {a}. Ni enquête ni sondage sectoriel : nos propres feuilles de temps, au dixième d’heure.","terrainDate":"Chiffres au {date}.","terrainMfl":"Voir aussi : Incident Amplifiers","terrainMflTexte":"notre bibliothèque publique des conditions qui aggravent un incident.","imprimer":"Imprimer / PDF","copier":"Copier le lien de ma saisie","copie":"Lien copié — il contient vos sept valeurs en clair.","copieEchec":"Copie impossible — sélectionnez l’adresse dans la barre d’adresse du navigateur.","piedConfidentialite":"Vos chiffres ne quittent pas votre navigateur : pas de script tiers, pas de police externe, aucun envoi de données. Enregistré sur votre poste et ouvert depuis le disque, ce fichier ne fait aucune requête réseau du tout.","piedSignature":"Secur01 — fournisseur de services de sécurité gérés","lienRecu":"Ces valeurs proviennent du lien que vous avez ouvert, et non de votre saisie. Vérifiez-les avant d’interpréter le résultat.","motPersonneUn":"personne","motPersonnePlusieurs":"personnes","etpPhrase":"soit {etp} {mot} à temps plein"},"en":{"lang":"en-CA","titre":"MSP Cyber Capacity Gap","kicker":"// Secur01 · measured, not estimated","thesePartie1":"Running a real cybersecurity division","thesePartie2":"takes hours nobody counts.","sousTitre":"Enter the size of your book of business and your team. The page returns the cybersecurity workload we measured for a book that size — in hours and in people — and the gap against the team you have.","basculer":"Français","basculerTitre":"Passer en français","saisieTitre":"Your book of business and your team","saisieIntro":"Seven numbers. They are not sent anywhere.","champs":{"utilisateurs":{"label":"Managed users","unite":"people"},"postes":{"label":"Managed endpoints","unite":"machines"},"boites":{"label":"Managed mailboxes","unite":"mailboxes"},"techniciens":{"label":"Technicians","unite":"full-time staff","aide":"Your whole technical team, not just cybersecurity. Part-time staff count pro rata."},"partOpsTI":{"label":"Share of their time taken by IT ops","unite":"%","aide":"Support, projects, cloud, network — everything that isn’t cybersecurity. This field determines the result."},"heuresCyberActuelles":{"label":"Cybersecurity hours per month, today","unite":"h / month","aide":"Your own estimate, as you would present it to a client."},"heuresProductives":{"label":"Productive hours per person per month","unite":"h / month","aide":"140 h is full-time less vacation, training and administration. Adjust to your own figure."}},"refus":{"manquants":"Missing:","invalides":"Invalid value:","parcVide":"A book of business at zero cannot be sized. Enter at least one user, endpoint or mailbox."},"effacer":"Clear","resultatTitre":"What this requires","chargeLabel":"Cybersecurity workload","chargeUnite":"h / month","chargeDetail":"Workload breakdown","chargePlancher":"This figure is a floor. The three bases above account for {part} % of the cybersecurity time we measured. The remainder maps to none of these three units: either the reference unit is not defined for the service in question, or that service falls under a separate contract. None of it is added here.","couvertureTitre":"Your coverage","couvertureLabel":"of the workload your team can cover","bandes":{"couvert":{"titre":"Covered on paper","texte":"Your team has the hours it needs — on average. What remains are the three realities below, and that is where the real difficulty sits: the average month appears in no calendar."},"sous_capacite":{"titre":"Structural under-capacity","texte":"You are short {manque} h a month. In staff assigned solely to cybersecurity, that represents {etp} full-time {etpMot}; in technicians like yours, who devote only part of their time to it, {personnes}. This is not a backlog to be worked down: it is a deficit that recurs every month, and it is settled in work left undone rather than in overtime."},"impossible":{"titre":"Beyond the current team’s capacity","texte":"You are short {manque} h a month. In staff assigned solely to cybersecurity, that represents {etp} full-time {etpMot}; in technicians like yours, {personnes}. At this level the question is no longer how work is organized: no prioritization creates {personnes} {personnesMot}.","texteSansDisponibilite":"You are short {manque} h a month — {etp} full-time {etpMot} assigned solely to cybersecurity. Your technicians are already 100 % on IT operations: hiring on the same terms adds no cybersecurity hours."}},"barreRequis":"Required workload","barreDispo":"Your team’s available capacity","barreDeclare":"What you estimate you spend","declarePhrase":"The {heures} h you estimate you spend cover {pct} % of the workload we measured for a book this size.","declarePhraseHaut":"The {heures} h you estimate you spend cover {pct} % of the measured workload — above what our ratios predict for a book this size.","realitesTitre":"The average is the best case","realitesIntro":"Three measurements that explain why this workload does not fit into the available gaps of an IT operations schedule.","realites":{"dispersion":{"titre":"A book of business is not an average","texte":"Dispersion is measured only on the users base. Your {utilisateurs} users represent {reference} h a month at our average ratio; from one of our clients to the next, that same population would require {bas} h to {haut} h, and {maxi} h at the ratio of our most demanding client.","mesure":"Measured client by client: four clients in five fall between {bas100} and {haut100} h per 100 users, median {mediane} — a factor of {facteur}. The full range runs from {mini} (a client with no minutes attributed over the period) to {maxi100}. A client above the median is not offset by one below it: both must be served in the same month."},"variabilite":{"titre":"The average does not hold two months running","texte":"At your scale, plan for between {creux} h and {pointe} h depending on the month. In the peak month your team covers {couverturePic} %.","mesure":"Measured here over {mois} months: {creuxMesure} h to {pointeMesure} h a month, a ratio of {rapport}. The factor is applied to your scale; the assumption is that the monthly profile carries from one book of business to another."},"concentration":{"titre":"A small share of tickets concentrates most of the time","texte":"{partTop1} % of the time is concentrated in 1 % of tickets, and {partTop5} % in 5 %. At your scale, that 1 % represents {heuresTop1} h a month.","mesure":"Measured across {billets} short-duration tickets: the median ticket accounts for {mediane} minutes, the 99th percentile {p99}, and the largest required {maxi} h. These hours concentrate on few events; they do not spread across short interventions."}},"supposeTitre":"What this calculation assumes","suppose":["The ratios come from a dedicated division, with its own tooling, processes and staff. A team that also runs IT operations is not more efficient than it is: it is interrupted.","Workload is assumed proportional to unit count. The measurement covers clients whose subscription counts at least three units; below that, the sample is too small to extrapolate.","Our ratios divide by a client’s largest subscription, which understates their real headcount. If their staff exceeds that base, the true ratio is lower: the workload shown here is therefore an upper bound — in the direction that favours our own case, which is all the more reason to say so.","Dispersion is measured across our clients, not across providers. It indicates how varied environments are, not how varied ways of serving them are.","Productive hours per person are the ones you entered. Every figure expressed in people depends on them.","This document is neither an audit nor a quote. It is a dated order of magnitude, and every assumption above can be verified."],"terrainTitre":"Where these numbers come from","terrainTexte":"Measured at Secur01 over {mois} months — {billets} tickets and {heures} h of cybersecurity work performed by our teams, from {de} to {a}. Neither a survey nor an industry poll: our own timesheets, to the tenth of an hour.","terrainDate":"Figures as of {date}.","terrainMfl":"See also: Incident Amplifiers","terrainMflTexte":"our public library of the conditions that make an incident worse.","imprimer":"Print / PDF","copier":"Copy a link to my inputs","copie":"Link copied — it contains your seven values in plain text.","copieEchec":"Copy failed — select the address in your browser’s address bar.","piedConfidentialite":"Your figures do not leave your browser: no third-party script, no external font, no data sent anywhere. Saved to your machine and opened from disk, this file makes no network request at all.","piedSignature":"Secur01 — managed security services provider","lienRecu":"These values come from the link you opened, not from your own input. Verify them before interpreting the result.","motPersonneUn":"person","motPersonnePlusieurs":"people","etpPhrase":"that is {etp} full-time {mot}"}}</script>
+<script type="application/json" id="donnees-config">{"version":"v1","heuresProductivesDefaut":140,"mflUrl":""}</script>
+<script>
+/**
+ * LE MOTEUR — pur, sans DOM, testé seul.
+ *
+ * Il ne connaît ni la page ni la langue : il prend le terrain mesuré et une
+ * saisie, il rend des nombres et des CLEFS de libellé. Tout ce qui se lit est
+ * dans i18n.json.
+ */
+
+/** Les sept champs de la saisie, dans l'ordre du lien partageable. */
+const CHAMPS = [
+  'utilisateurs', 'postes', 'boites', 'techniciens',
+  'partOpsTI', 'heuresCyberActuelles', 'heuresProductives',
+];
+
+/** Les trois bandes de couverture. L'ordre compte : on rend la PREMIÈRE qui prend. */
+const BANDES = [
+  { clef: 'impossible', max: 60 },
+  { clef: 'sous_capacite', max: 100 },
+  { clef: 'couvert', max: Infinity },
+];
+
+/**
+ * LA BANDE, À PARTIR DE LA SEULE COUVERTURE.
+ *
+ * Extraite pour que le test puisse pousser 59,999 et 60 sans passer par un
+ * nombre de techniciens : viser une couverture exacte en réglant un technicien
+ * fractionnaire fait passer la borne du mauvais côté par arrondi flottant, et
+ * le test mesurait alors sa propre arithmétique au lieu de la règle.
+ */
+const bandeDe = (couverture) => BANDES.find((b) => couverture < b.max).clef;
+
+/**
+ * LES SEUILS DE BANDE, DÉRIVÉS DE `BANDES` — jamais recopiés.
+ *
+ * `arrondiSansFranchir` appelait `[60, 100]` en dur : le jour où une bande
+ * changerait de seuil (60 → 65, une décision d'affaires plausible), rien
+ * n'aurait forcé à mettre cette liste à jour, et le bug qu'`arrondiSansFranchir`
+ * existe pour corriger — « 100 % » affiché sous « Sous-capacité structurelle » —
+ * redeviendrait possible en silence sur le NOUVEAU seuil.
+ */
+const SEUILS_BANDE = BANDES.map((b) => b.max).filter(Number.isFinite);
+
+/**
+ * ARRONDIR SANS FRANCHIR UN SEUIL QUI DÉCIDE D'UNE PHRASE.
+ *
+ * La bande se choisissait en pleine précision et le pourcentage s'affichait
+ * arrondi. À 99,70 % de couverture, la page imprimait « 100 % » en gros, et
+ * juste dessous « Sous-capacité structurelle — il manque 0 h par mois, c'est un
+ * déficit qui se reproduit chaque mois ». Le lecteur voit une erreur de calcul
+ * sur la page qui lui explique qu'on mesure au dixième d'heure.
+ *
+ * Un nombre dont la valeur exacte est d'un côté d'un seuil ne s'affiche jamais
+ * de l'autre côté.
+ */
+function arrondiSansFranchir(valeur, seuils) {
+  let r = Math.round(valeur);
+  for (const s of seuils) {
+    if (valeur < s && r >= s) r = s - 1;
+    if (valeur >= s && r < s) r = s;
+  }
+  return r;
+}
+
+const estNombre = (v) => typeof v === 'number' && Number.isFinite(v);
+
+/**
+ * LES BORNES HAUTES, ET POURQUOI ELLES NE SONT PAS DU CONFORT.
+ *
+ * La validation ne bornait que par le bas. Un lien fabriqué —
+ * `#v1.fr.99999999999999999999-1-1-1-0-0-140` — faisait imprimer « 8,8 × 10¹⁶
+ * ETP manquants » sous la signature Secur01, sans toucher au fichier. Un
+ * concurrent n'a qu'à envoyer ce lien au prospect d'un MSP en le présentant
+ * comme notre évaluation de lui.
+ *
+ * Les plages sont larges à dessein : elles écartent l'absurde, pas le gros
+ * client. Le plus grand MSP nord-américain gère loin sous le million d'unités.
+ */
+const BORNES = {
+  utilisateurs: 1e6, postes: 1e6, boites: 1e6,
+  techniciens: 1e4, partOpsTI: 100, heuresCyberActuelles: 1e6,
+};
+/** Les heures productives par ETP ont un plancher ET un plafond : 300 h/mois est déjà 70 h/semaine. */
+const HEURES_PRODUCTIVES = { min: 20, max: 300 };
+
+/**
+ * LA VALIDATION NOMME LE CHAMP FAUTIF, et elle ne rend jamais un nombre.
+ *
+ * Une saisie vide n'est pas une saisie à zéro : « 0 technicien » est une
+ * réponse, « champ vide » est l'absence de réponse. Les deux ne peuvent pas
+ * partager le même retour, sinon la page calcule une couverture de 0 % pour un
+ * formulaire qu'on vient d'ouvrir.
+ */
+function valider(saisie) {
+  const manquants = [];
+  const invalides = [];
+  for (const c of CHAMPS) {
+    const v = saisie[c];
+    if (v === undefined || v === null || v === '') { manquants.push(c); continue; }
+    if (!estNombre(v) || v < 0) { invalides.push(c); }
+  }
+  // LES BORNES HAUTES, champ par champ.
+  for (const [c, max] of Object.entries(BORNES)) {
+    if (estNombre(saisie[c]) && saisie[c] > max && !invalides.includes(c)) invalides.push(c);
+  }
+  const hp = saisie.heuresProductives;
+  if (estNombre(hp) && (hp < HEURES_PRODUCTIVES.min || hp > HEURES_PRODUCTIVES.max)
+    && !invalides.includes('heuresProductives')) {
+    invalides.push('heuresProductives');
+  }
+  const parc = ['utilisateurs', 'postes', 'boites'];
+  const parcVide = parc.every((c) => saisie[c] === 0)
+    && parc.every((c) => estNombre(saisie[c]));
+  return { manquants, invalides, parcVide, bon: manquants.length === 0 && invalides.length === 0 && !parcVide };
+}
+
+/**
+ * LA CHARGE, ASSIETTE PAR ASSIETTE.
+ *
+ * Les trois ratios s'additionnent parce que le numérateur d'origine est
+ * PARTITIONNÉ par assiette : chaque minute mesurée entre dans une seule des
+ * trois, et le temps qu'aucun service ne porte y est réparti au prorata plutôt
+ * que versé en double. Additionner ne recompte donc rien.
+ *
+ * MAIS LA SOMME DES TROIS NE VAUT PAS TOUT LE TRAVAIL MESURÉ : les minutes dont
+ * le service ne déclare aucune assiette, ou dont le socle tient sous trois
+ * unités, n'entrent dans aucun ratio. `partDuTerrainCouverte` le mesure, et la
+ * page l'écrit. C'est ce qui fait de cette charge un PLANCHER.
+ */
+function charge(terrain, saisie) {
+  const a = terrain.parAssiette;
+  const postes = [
+    { clef: 'utilisateurs', heures: (a.utilisateur.heuresPar100 * saisie.utilisateurs) / 100 },
+    { clef: 'postes', heures: (a.poste.heuresPar100 * saisie.postes) / 100 },
+    { clef: 'boites', heures: (a.boiteCourriel.heuresPar100 * saisie.boites) / 100 },
+  ];
+  return { postes, total: postes.reduce((n, p) => n + p.heures, 0) };
+}
+
+/**
+ * La part du temps mesuré que les trois assiettes portent — donc ce qui MANQUE
+ * à la charge, et ce qui fait d'elle un plancher.
+ *
+ * Elle se calculait ici depuis les minutes brutes de chaque assiette. Ces
+ * minutes donnaient le parc sous gestion de Secur01 (voir l'en-tête de
+ * `ops/exporter-terrain.sh`) : la part est désormais précalculée à l'export, et
+ * seul ce pourcentage — sans échelle — voyage dans le fichier.
+ */
+function partDuTerrainCouverte(terrain) {
+  return terrain.partAssiettesCouverte;
+}
+
+/**
+ * L'AMPLITUDE MENSUELLE, EN MULTIPLICATEURS.
+ *
+ * Le creux et la pointe sont ceux de la charge TOTALE de Secur01 sur 24 mois ;
+ * rapportés à sa propre moyenne, ils donnent deux facteurs sans dimension,
+ * qu'on peut appliquer à une autre échelle. Ce que ça suppose — que la forme du
+ * mois se conserve d'un parc à l'autre — est écrit sur la page.
+ */
+function amplitude(terrain) {
+  const moyenne = terrain.entete.heuresTravaillees / terrain.chargeMensuelle.moisMesures;
+  return {
+    moyenneMensuelle: moyenne,
+    facteurCreux: terrain.chargeMensuelle.creux / moyenne,
+    facteurPointe: terrain.chargeMensuelle.pointe / moyenne,
+  };
+}
+
+/** Le calcul complet. Rend `{ refus }` OU le résultat — jamais les deux, jamais un mélange. */
+function calculer(terrain, saisie) {
+  const v = valider(saisie);
+  if (!v.bon) return { refus: v };
+
+  const c = charge(terrain, saisie);
+  const etpRequis = c.total / saisie.heuresProductives;
+  // LA PART DISPONIBLE D'UN TECHNICIEN DU LECTEUR, en heures de cybersécurité
+  // par mois. C'est elle qui convertit un manque en PERSONNES ; l'ETP, lui, est
+  // un ETP dédié, et confondre les deux faisait dire à la page qu'il manquait
+  // « 1,8 personnes » là où il en fallait 9,1.
+  const parTechnicien = (saisie.heuresProductives * (100 - saisie.partOpsTI)) / 100;
+  // LA DIVISION VIENT EN DERNIER. `× (1 − 80/100)` passe par 0,199999…, et
+  // 6 × 140 rendait 167,999999999999 h : un nombre juste à l'œil, faux au test,
+  // et qui faisait basculer une borne de bande par arrondi.
+  const dispo = saisie.techniciens * parTechnicien;
+  const couverture = (100 * dispo) / c.total;
+  const declare = (100 * saisie.heuresCyberActuelles) / c.total;
+  const amp = amplitude(terrain);
+  const manque = Math.max(0, c.total - dispo);
+  const bande = bandeDe(couverture);
+
+  return {
+    refus: null,
+    charge: c,
+    etpRequis,
+    heuresDisponibles: dispo,
+    couverture,
+    declare,
+    // CE QUI S'AFFICHE, séparé de ce qui se calcule — voir arrondiSansFranchir.
+    couvertureAffichee: arrondiSansFranchir(couverture, SEUILS_BANDE),
+    declareAffiche: arrondiSansFranchir(declare, [100]),
+    manque,
+    etpManquants: manque / saisie.heuresProductives,
+    /**
+     * Le manque en TECHNICIENS COMME LES SIENS — `null` quand ses techniciens
+     * sont à 100 % sur les ops TI, parce qu'alors aucune embauche au même
+     * régime n'ajoute une heure et que le nombre n'existe pas. La page a une
+     * phrase distincte pour ce cas, plutôt qu'un Infinity déguisé en mesure.
+     */
+    personnesManquantes: parTechnicien === 0 ? null : manque / parTechnicien,
+    bande,
+    partDuTerrainCouverte: partDuTerrainCouverte(terrain),
+    // LES TROIS RÉALITÉS, À SON ÉCHELLE.
+    dispersion: {
+      /**
+       * LE POINT DE COMPARAISON, ET POURQUOI IL EST INDISPENSABLE.
+       *
+       * Ces bornes s'appliquent à la SEULE assiette « utilisateurs », parce que
+       * c'est la seule sur laquelle la dispersion est mesurée. La carte les
+       * posait à côté de la charge TOTALE : elle annonçait « la charge va de
+       * 25 h à 428 h » à côté d'un total de 255 h, et un lecteur qui divise
+       * prenait la page en défaut. `reference` est la part utilisateurs de sa
+       * charge — le nombre auquel ces bornes se comparent réellement.
+       */
+      reference: (terrain.parAssiette.utilisateur.heuresPar100 * saisie.utilisateurs) / 100,
+      basHeures: (terrain.dispersion.bas * saisie.utilisateurs) / 100,
+      medianeHeures: (terrain.dispersion.mediane * saisie.utilisateurs) / 100,
+      hautHeures: (terrain.dispersion.haut * saisie.utilisateurs) / 100,
+      maxiHeures: (terrain.dispersion.maxi * saisie.utilisateurs) / 100,
+    },
+    variabilite: {
+      creuxHeures: c.total * amp.facteurCreux,
+      pointeHeures: c.total * amp.facteurPointe,
+      rapport: amp.facteurPointe / amp.facteurCreux,
+      // L'ÉQUIPE EST-ELLE DÉPASSÉE AU MOIS DE POINTE ? La question que la
+      // moyenne escamote, et la seule qui compte pour une garde.
+      couvertureAuPic: (100 * dispo) / (c.total * amp.facteurPointe),
+    },
+    concentration: terrain.concentration.map((t) => ({
+      topPct: t.topPct,
+      partDuTemps: t.partDuTemps,
+      heures: (c.total * t.partDuTemps) / 100,
+    })),
+  };
+}
+
+/* ------------------------------------------------------------------------- */
+
+/**
+ * LE LIEN PARTAGEABLE : `#v1.fr.1500-1200-1600-6-80-40-140`.
+ *
+ * Aucun encodage exotique — il doit rester lisible et modifiable à la main dans
+ * la barre d'adresse, y compris en file://. Le décodeur REFUSE tout ce qu'il ne
+ * reconnaît pas plutôt que de remplir à moitié : un lien tronqué qui pré-remplit
+ * trois champs sur sept produirait un résultat faux sous une saisie d'apparence
+ * complète.
+ */
+function encoderHash(version, langue, saisie) {
+  return `#${version}.${langue}.${CHAMPS.map((c) => saisie[c]).join('-')}`;
+}
+
+function decoderHash(version, hash) {
+  if (typeof hash !== 'string') return null;
+  // LE SÉPARATEUR NE PEUT PAS ÊTRE UN `split('.')`.
+  //
+  // Une saisie décimale — 2,5 techniciens, 62,5 % d'ops TI — écrit des points
+  // dans les valeurs. Découper sur le point rendait cinq morceaux au lieu de
+  // trois, et le lien d'un MSP à temps partiel se perdait en silence : la page
+  // s'ouvrait vierge sans dire pourquoi. Les deux premiers champs se prennent
+  // par une ancre, le reste est le bloc de valeurs, points compris.
+  const m = /^#?([^.]+)\.([^.]+)\.(.+)$/.exec(hash);
+  if (m === null) return null;
+  const [, v, langue, valeurs] = m;
+  if (v !== version) return null;
+  if (langue !== 'fr' && langue !== 'en') return null;
+  const nums = valeurs.split('-');
+  if (nums.length !== CHAMPS.length) return null;
+  const saisie = {};
+  for (let i = 0; i < CHAMPS.length; i++) {
+    // `Number('')` vaut 0 et `Number('12abc')` vaut NaN : les deux doivent
+    // échouer, et seul le test explicite le fait.
+    if (!/^\d+(\.\d+)?$/.test(nums[i])) return null;
+    saisie[CHAMPS[i]] = Number(nums[i]);
+  }
+  if (!valider(saisie).bon) return null;
+  return { langue, saisie };
+}
+
+/**
+ * LA PAGE. Elle ne calcule rien : elle lit le terrain, appelle le moteur, et
+ * pose des nombres déjà faits. Tout le texte vient d'i18n.json.
+ */
+const TERRAIN = JSON.parse(document.getElementById('donnees-terrain').textContent);
+const I18N = JSON.parse(document.getElementById('donnees-i18n').textContent);
+const CONFIG = JSON.parse(document.getElementById('donnees-config').textContent);
+
+let langue = 'fr';
+const T = () => I18N[langue];
+
+/* --- Nombres, dans la langue affichée --------------------------------- */
+// Les formateurs sont mémoïsés par langue : `rendre()` tourne à chaque frappe
+// et en construisait une quarantaine à chaque fois.
+const formateurs = new Map();
+const nf = (min, max) => {
+  const clef = `${langue}.${min}.${max}`;
+  if (!formateurs.has(clef)) {
+    formateurs.set(clef, new Intl.NumberFormat(T().lang, {
+      minimumFractionDigits: min, maximumFractionDigits: max,
+    }));
+  }
+  return formateurs.get(clef);
+};
+const N0 = (v) => nf(0, 0).format(Math.round(v));
+const N1 = (v) => nf(1, 1).format(v);
+const N2 = (v) => nf(2, 2).format(v);
+/**
+ * DES HEURES QUI NE S'AFFICHENT PAS « 0 » QUAND IL EN MANQUE.
+ *
+ * `N0` rendait « il manque 0 h par mois » sous le titre « Sous-capacité
+ * structurelle » pour un manque de 0,75 h. La précision suit la grandeur.
+ */
+const H = (v) => (v >= 10 ? N0(v) : (v >= 1 ? N1(v) : N2(v)));
+/**
+ * LE PLURIEL, ET POURQUOI LES DEUX LANGUES NE SUIVENT PAS LA MÊME RÈGLE.
+ *
+ * La page compte des personnes en décimales : 0,6 · 1,8 · 3,1. Le français met
+ * au pluriel à partir de DEUX — « 1,8 personne » est correct, « 1,8 personnes »
+ * est une faute. L'anglais met au pluriel dès que le compte n'est pas exactement
+ * un — « 1.8 people ». Écrire « 3,1 personne » sur une page qui se vante de
+ * mesurer au dixième d'heure, c'est se faire relire par le mauvais détail.
+ *
+ * L'ACCORD SE DÉCIDE SUR LE NOMBRE AFFICHÉ, PAS SUR LE NOMBRE EXACT.
+ *
+ * Toutes les valeurs comptées ici sont montrées par `N1`, à une décimale. Une
+ * valeur brute de 1,9541 s'affiche « 2,0 » mais restait, avant ce correctif,
+ * jugée singulière (1,9541 < 2) : la page écrivait « 2,0 personne ». Même
+ * défaut que celui qu'`arrondiSansFranchir` corrige pour les bandes — un seuil
+ * jugé sur la précision exacte alors que le lecteur ne voit que l'arrondi.
+ * `nombreAffiche(n)` refait l'arrondi qu'`N1` va appliquer, dans la locale
+ * courante, avant de choisir le mot — un simple `.replace(',', '.')` casserait
+ * sur l'anglais, où la virgule sépare les milliers (« 1,234.5 »).
+ */
+const nombreAffiche = (n) => {
+  const parties = nf(1, 1).formatToParts(n);
+  const brut = parties
+    .filter((p) => p.type === 'integer' || p.type === 'decimal' || p.type === 'fraction'
+      || p.type === 'minusSign')
+    .map((p) => (p.type === 'decimal' ? '.' : p.value)).join('');
+  return Number(brut);
+};
+const pluriel = (n) => {
+  const affiche = nombreAffiche(n);
+  return langue === 'fr' ? Math.abs(affiche) >= 2 : affiche !== 1;
+};
+const motPersonne = (n) => (pluriel(n) ? T().motPersonnePlusieurs : T().motPersonneUn);
+// L'apostrophe et l'accent grave sont échappés eux aussi : aucun attribut
+// généré ici n'est en apostrophes aujourd'hui, mais le prochain le sera, et le
+// trou serait invisible.
+const esc = (s) => String(s).replace(/[&<>"'`]/g, (c) => (
+  { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;', '`': '&#96;' }[c]));
+
+/**
+ * L'INTERPOLATION NE LAISSE PASSER AUCUN TROU.
+ *
+ * Un `{clef}` sans valeur restait affiché tel quel dans la phrase — le genre de
+ * défaut qui se voit chez le prospect et pas chez soi. Ici il jette, donc il se
+ * voit au test de construction.
+ */
+function fmt(gabarit, valeurs) {
+  return gabarit.replace(/\{(\w+)\}/g, (_, clef) => {
+    if (!(clef in valeurs)) throw new Error(`Interpolation absente : ${clef}`);
+    return esc(valeurs[clef]);
+  });
+}
+
+/* --- La saisie -------------------------------------------------------- */
+const saisie = {};
+/**
+ * LES CHAMPS QUE LE LECTEUR A TOUCHÉS.
+ *
+ * Sans ça, la page listait six champs manquants en rouge AVANT la première
+ * frappe : `heuresProductives` étant pré-rempli à 140, le compte des manquants
+ * n'atteignait jamais les sept champs et la garde « formulaire vierge » ne
+ * prenait jamais. On ne reproche au lecteur que ce qu'il a vidé lui-même.
+ */
+const touches = new Set();
+/** Vrai tant que le résultat affiché vient d'un lien et non du clavier du lecteur. */
+let valeursRecuesParLien = false;
+const grille = document.getElementById('grille-champs');
+
+function dessinerChamps() {
+  grille.innerHTML = '';
+  for (const c of CHAMPS) {
+    const d = T().champs[c];
+    const div = document.createElement('div');
+    div.className = 'champ';
+    // `type="text"` ET NON `type="number"`, à cause de la virgule décimale.
+    //
+    // Sur un navigateur en fr-CA, `type="number"` refuse « 2,5 » : `value`
+    // rend la chaîne vide, et la page répondait « Il manque : Techniciens »
+    // juste après que le lecteur y avait écrit quelque chose. Le décodeur de
+    // lien acceptait le point, le formulaire n'acceptait que lui — deux
+    // conventions pour le même nombre. `inputmode="decimal"` garde le pavé
+    // numérique sur mobile.
+    div.innerHTML = `<label for="f-${c}">${esc(d.label)}</label>
+      <span class="entree"><input id="f-${c}" name="${c}" type="text"
+        inputmode="decimal" autocomplete="off" spellcheck="false"
+        ><span class="unite">${esc(d.unite)}</span></span>
+      ${d.aide ? `<div class="aide">${esc(d.aide)}</div>` : ''}`;
+    grille.append(div);
+    const input = div.querySelector('input');
+    if (saisie[c] !== undefined) input.value = saisie[c];
+    input.addEventListener('input', () => {
+      const v = input.value.trim();
+      touches.add(c);
+      // Dès que le lecteur touche un champ, le résultat est le SIEN : le
+      // bandeau de provenance n'a plus lieu d'être.
+      valeursRecuesParLien = false;
+      if (v === '') delete saisie[c];
+      // Les espaces (fines ou insécables) que produit un copier-coller depuis
+      // un tableur, et la virgule décimale, sont retirés avant la conversion.
+      // Ce qui reste doit être un nombre ENTIER de bout en bout : `Number` sur
+      // « 12ab » rend NaN, que `valider()` refuse en nommant le champ.
+      else saisie[c] = Number(v.replace(/[\s  ]/g, '').replace(',', '.'));
+      rendre();
+    });
+  }
+}
+
+/* --- Le rendu du résultat --------------------------------------------- */
+const boite = document.getElementById('resultat');
+const avis = document.getElementById('avis');
+
+function rendre() {
+  const r = calculer(TERRAIN, saisie);
+  if (r.refus !== null) {
+    boite.hidden = true;
+    avis.className = 'avis';
+    avis.textContent = messageRefus(r.refus);
+    return;
+  }
+  avis.textContent = '';
+  boite.hidden = false;
+  /**
+   * LES GRANDEURS SONT EXPOSÉES SUR LE CONTENEUR, QUI LUI SURVIT AU RENDU.
+   *
+   * `boite.innerHTML` remplace les enfants à chaque frappe : une animation
+   * posée sur eux repart de zéro à chaque chiffre tapé, ce qui est insupportable
+   * pour une jauge. `boite`, elle, persiste — donc une propriété personnalisée
+   * ENREGISTRÉE et posée ici se TRANSITIONNE d'une valeur à l'autre au lieu de
+   * se rejouer. C'est ce qui rend une jauge fluide possible sans une ligne de
+   * JavaScript dans l'habillage.
+   *
+   * C'est une donnée, pas un comportement : les habillages qui n'en veulent pas
+   * l'ignorent, et le script reste le même pour tous.
+   */
+  boite.style.setProperty('--couverture', String(r.couvertureAffichee));
+  boite.style.setProperty('--declare', String(r.declareAffiche));
+  boite.innerHTML = vueResultat(r);
+  brancherActions();
+}
+
+function messageRefus(refus) {
+  const t = T();
+  if (refus.parcVide) return t.refus.parcVide;
+  const nom = (c) => t.champs[c].label;
+  if (refus.invalides.length > 0) {
+    return `${t.refus.invalides} ${refus.invalides.map(nom).join(', ')}`;
+  }
+  // LE FORMULAIRE VIERGE NE SE FAIT PAS ENGUEULER : on ne nomme que les champs
+  // que le lecteur a vidés lui-même, jamais ceux qu'il n'a pas encore atteints.
+  const vides = refus.manquants.filter((c) => touches.has(c));
+  if (vides.length === 0) return '';
+  return `${t.refus.manquants} ${vides.map(nom).join(', ')}`;
+}
+
+function vueResultat(r) {
+  const t = T();
+  const p = TERRAIN.provenance.fenetre;
+  const d = TERRAIN.dispersion;
+  const top = (pct) => r.concentration.find((x) => x.topPct === pct);
+
+  // LA VARIANTE SANS DISPONIBILITÉ, quand ses techniciens sont entièrement sur
+  // les ops TI : le compte de personnes n'existe pas, et la page le dit
+  // autrement plutôt que d'imprimer un Infinity.
+  const bandeI18n = t.bandes[r.bande];
+  const bandeTexte = r.personnesManquantes === null && bandeI18n.texteSansDisponibilite !== undefined
+    ? fmt(bandeI18n.texteSansDisponibilite, {
+      manque: H(r.manque), etp: N1(r.etpManquants), etpMot: motPersonne(r.etpManquants),
+    })
+    : fmt(bandeI18n.texte, {
+      manque: H(r.manque), etp: N1(r.etpManquants), etpMot: motPersonne(r.etpManquants),
+      ...(bandeI18n.texte.includes('{personnes}')
+        ? {
+          personnes: N1(r.personnesManquantes),
+          personnesMot: motPersonne(r.personnesManquantes),
+        } : {}),
+    });
+
+  const barre = (classe, libelle, heures, plafond) => `
+    <div class="barre barre--${classe}">
+      <div class="t"><span>${esc(libelle)}</span><span class="num">${N0(heures)} h</span></div>
+      <div class="p"><i style="width:${Math.min(100, (100 * heures) / plafond).toFixed(1)}%"></i></div>
+    </div>`;
+  const plafond = Math.max(r.charge.total, r.heuresDisponibles, saisie.heuresCyberActuelles) || 1;
+
+  // LA BRANCHE SE DÉCIDE SUR LA VALEUR AFFICHÉE. Sur la valeur exacte, la page
+  // pouvait écrire « couvrent 100 % — au-dessus de ce que nos ratios
+  // prévoient » pour 100,4 %, et « couvrent 100 % » tout court pour 99,7 %.
+  const declarePhrase = r.declareAffiche > 100 ? t.declarePhraseHaut : t.declarePhrase;
+
+  return `
+  ${valeursRecuesParLien ? `<div class="bandeau-lien" role="note">${esc(t.lienRecu)}</div>` : ''}
+  <h2 class="section">${esc(t.resultatTitre)}</h2>
+  <div class="duo">
+    <div class="carte" style="margin:0">
+      <div class="oeil">${esc(t.chargeLabel)}</div>
+      <div class="gros num">${N0(r.charge.total)}<span class="u">${esc(t.chargeUnite)}</span></div>
+      <p class="doux petit" style="margin-top:.6rem">${fmt(t.etpPhrase, {
+    etp: N1(r.etpRequis), mot: motPersonne(r.etpRequis),
+  })}</p>
+      <table class="decomp">
+        <caption class="oeil" style="text-align:left;margin:.8rem 0 0">${esc(t.chargeDetail)}</caption>
+        <tbody>
+          ${r.charge.postes.map((x) => `<tr><td>${esc(t.champs[x.clef].label)}</td>
+            <td class="n">${N1(x.heures)} h</td></tr>`).join('')}
+          <tr><td>${esc(t.chargeLabel)}</td><td class="n">${N1(r.charge.total)} h</td></tr>
+        </tbody>
+      </table>
+      <p class="doux tres-petit" style="margin-top:.8rem">${
+  fmt(t.chargePlancher, { part: N1(r.partDuTerrainCouverte) })}</p>
+    </div>
+
+    <div class="carte" style="margin:0">
+      <div class="oeil">${esc(t.couvertureTitre)}</div>
+      <div class="gros num">${N0(r.couvertureAffichee)}<span class="u">%</span></div>
+      <p class="doux petit" style="margin-top:.6rem">${esc(t.couvertureLabel)}</p>
+      <div class="bande bande--${r.bande}">
+        <h3>${esc(t.bandes[r.bande].titre)}</h3>
+        <p class="petit">${bandeTexte}</p>
+      </div>
+      <div class="barres">
+        ${barre('requis', t.barreRequis, r.charge.total, plafond)}
+        ${barre('dispo', t.barreDispo, r.heuresDisponibles, plafond)}
+        ${barre('declare', t.barreDeclare, saisie.heuresCyberActuelles, plafond)}
+      </div>
+      <p class="doux petit" style="margin-top:.8rem">${fmt(declarePhrase, {
+    heures: N0(saisie.heuresCyberActuelles), pct: N0(r.declareAffiche),
+  })}</p>
+    </div>
+  </div>
+
+  <h2 class="section">${esc(t.realitesTitre)}</h2>
+  <p class="doux" style="margin-bottom:1rem">${esc(t.realitesIntro)}</p>
+  <div class="trois">
+    <div class="realite">
+      <h3>${esc(t.realites.dispersion.titre)}</h3>
+      <p class="petit">${fmt(t.realites.dispersion.texte, {
+    utilisateurs: N0(saisie.utilisateurs), reference: N1(r.dispersion.reference),
+    bas: N1(r.dispersion.basHeures),
+    haut: N1(r.dispersion.hautHeures), maxi: N1(r.dispersion.maxiHeures),
+  })}</p>
+      <div class="mesure">${fmt(t.realites.dispersion.mesure, {
+    // LE FACTEUR DOIT SE RAPPORTER À LA PAIRE QU'ON VIENT D'ÉCRIRE.
+    //
+    // Il valait `maxi / bas` à côté d'une étendue annoncée `mini → maxi` : le
+    // lecteur qui divisait 56,8 par 0,00 ne retrouvait pas le 34 imprimé juste
+    // après. Les deux nombres d'une même phrase se rapportent maintenant aux
+    // mêmes bornes, et l'étendue complète est donnée à part.
+    bas100: N2(d.bas), haut100: N1(d.haut), mediane: N2(d.mediane),
+    facteur: N0(d.haut / d.bas),
+    mini: N2(d.mini), maxi100: N1(d.maxi),
+  })}</div>
+    </div>
+    <div class="realite">
+      <h3>${esc(t.realites.variabilite.titre)}</h3>
+      <p class="petit">${fmt(t.realites.variabilite.texte, {
+    creux: N0(r.variabilite.creuxHeures), pointe: N0(r.variabilite.pointeHeures),
+    couverturePic: N0(r.variabilite.couvertureAuPic),
+  })}</p>
+      <div class="mesure">${fmt(t.realites.variabilite.mesure, {
+    mois: N0(TERRAIN.chargeMensuelle.moisMesures),
+    creuxMesure: N0(TERRAIN.chargeMensuelle.creux),
+    pointeMesure: N0(TERRAIN.chargeMensuelle.pointe),
+    rapport: N1(r.variabilite.rapport),
+  })}</div>
+    </div>
+    <div class="realite">
+      <h3>${esc(t.realites.concentration.titre)}</h3>
+      <p class="petit">${fmt(t.realites.concentration.texte, {
+    partTop1: N1(top(1).partDuTemps), partTop5: N1(top(5).partDuTemps),
+    heuresTop1: N1(top(1).heures),
+  })}</p>
+      <div class="mesure">${fmt(t.realites.concentration.mesure, {
+    billets: N0(TERRAIN.distribution.billetsPonctuels),
+    mediane: N0(TERRAIN.distribution.medianeMinutes),
+    p99: N0(TERRAIN.distribution.p99Minutes),
+    maxi: N0(TERRAIN.distribution.maxiMinutes / 60),
+  })}</div>
+    </div>
+  </div>
+
+  <h2 class="section">${esc(t.supposeTitre)}</h2>
+  <div class="carte">
+    <ul class="suppose">${t.suppose.map((s) => `<li>${esc(s)}</li>`).join('')}</ul>
+  </div>
+
+  <h2 class="section">${esc(t.terrainTitre)}</h2>
+  <div class="carte carte--rail">
+    <p>${fmt(t.terrainTexte, {
+    mois: N0(TERRAIN.entete.mois), billets: N0(TERRAIN.entete.billets),
+    heures: N0(TERRAIN.entete.heuresTravaillees), de: p.de, a: p.a,
+  })}</p>
+    <p class="doux tres-petit mono">${fmt(t.terrainDate, { date: TERRAIN.mesureLe })}</p>
+    ${CONFIG.mflUrl === '' ? '' : `<p class="petit"><a href="${esc(CONFIG.mflUrl)}">${
+  esc(t.terrainMfl)}</a> — ${esc(t.terrainMflTexte)}</p>`}
+    <div class="actions">
+      <button class="action" type="button" id="imprimer">${esc(t.imprimer)}</button>
+      <button class="action action--fantome" type="button" id="copier">${esc(t.copier)}</button>
+      <span id="copie-avis" class="confirme" role="status" aria-live="polite"></span>
+    </div>
+  </div>`;
+}
+
+/* --- Actions ---------------------------------------------------------- */
+function brancherActions() {
+  document.getElementById('imprimer').addEventListener('click', () => window.print());
+  document.getElementById('copier').addEventListener('click', async () => {
+    const cible = document.getElementById('copie-avis');
+    const lien = location.href.split('#')[0] + encoderHash(CONFIG.version, langue, saisie);
+    try {
+      await navigator.clipboard.writeText(lien);
+      cible.className = 'confirme';
+      cible.textContent = T().copie;
+    } catch {
+      // `file://` sans geste utilisateur, permission refusée, navigateur ancien :
+      // la page dit quoi faire à la main au lieu de laisser un bouton mort.
+      cible.className = 'avis';
+      cible.textContent = T().copieEchec;
+    }
+    setTimeout(() => { cible.textContent = ''; }, 4000);
+  });
+}
+
+/**
+ * LA SAISIE N'EST PLUS ÉCRITE DANS L'ADRESSE, ET C'EST UN RETRAIT VOULU.
+ *
+ * `rendre()` appelait `history.replaceState` à chaque frappe, dès les sept
+ * champs remplis. La taille du parc et l'effectif d'un MSP sont des
+ * renseignements commerciaux, et l'adresse les emmenait dans l'historique du
+ * navigateur — donc dans l'autocomplétion de la barre d'adresse, qui les
+ * déroule devant qui regarde l'écran, et dans la synchronisation nuagique du
+ * navigateur, qui remonte le fragment.
+ *
+ * Le bouton « Copier le lien » construit le lien lui-même : rien n'est perdu,
+ * et le partage devient un geste explicite. Un lien reçu se lit toujours au
+ * chargement.
+ */
+
+function poserLangue(l) {
+  langue = l;
+  document.documentElement.lang = T().lang;
+  document.documentElement.dataset.langue = l;
+  const autre = l === 'fr' ? 'en' : 'fr';
+  const b = document.getElementById('bascule');
+  b.textContent = T().basculer;
+  b.title = T().basculerTitre;
+  b.dataset.vers = autre;
+  document.getElementById('t-kicker').textContent = T().kicker;
+  document.getElementById('t-these1').textContent = T().thesePartie1;
+  document.getElementById('t-these2').textContent = T().thesePartie2;
+  document.getElementById('t-sous').textContent = T().sousTitre;
+  document.getElementById('t-saisie-oeil').textContent = T().saisieTitre;
+  document.getElementById('t-saisie-titre').textContent = T().saisieTitre;
+  document.getElementById('t-saisie-intro').textContent = T().saisieIntro;
+  document.getElementById('effacer').textContent = T().effacer;
+  document.getElementById('t-pied-conf').textContent = T().piedConfidentialite;
+  document.getElementById('t-pied-sign').textContent = T().piedSignature;
+  dessinerChamps();
+  rendre();
+}
+
+document.getElementById('bascule').addEventListener('click', (e) => {
+  poserLangue(e.currentTarget.dataset.vers);
+});
+
+document.getElementById('effacer').addEventListener('click', () => {
+  for (const c of CHAMPS) delete saisie[c];
+  touches.clear();
+  valeursRecuesParLien = false;
+  saisie.heuresProductives = CONFIG.heuresProductivesDefaut;
+  dessinerChamps();
+  rendre();
+});
+
+/* --- Amorçage --------------------------------------------------------- */
+const depuisLien = decoderHash(CONFIG.version, location.hash);
+if (depuisLien !== null) {
+  Object.assign(saisie, depuisLien.saisie);
+  // LE LECTEUR DOIT SAVOIR QUE CES CHIFFRES NE SONT PAS LES SIENS.
+  //
+  // Un lien fabriqué — parc réel d'un MSP, un demi-technicien — rendait un
+  // verdict alarmiste sous la signature Secur01, indistinguable d'une saisie
+  // faite sur place. Le bandeau est le correctif qui coupe ce scénario ; les
+  // bornes hautes de `valider()` en sont le second.
+  valeursRecuesParLien = true;
+  for (const c of CHAMPS) touches.add(c);
+  poserLangue(depuisLien.langue);
+} else {
+  // LA VALEUR PAR DÉFAUT N'EST POSÉE QUE SUR LE CHAMP QUI EN A UNE. Pré-remplir
+  // un parc d'exemple ferait afficher un résultat que le lecteur n'a pas saisi,
+  // et il le prendrait pour le sien.
+  saisie.heuresProductives = CONFIG.heuresProductivesDefaut;
+  poserLangue(navigator.language && navigator.language.startsWith('en') ? 'en' : 'fr');
+}
+
+</script>
+</body>
+</html>
